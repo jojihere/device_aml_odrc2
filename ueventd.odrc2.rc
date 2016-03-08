@@ -1,0 +1,3 @@
+# Mali
+/dev/mali                 0666   system     graphics
+/dev/ion                  0666   system     graphics

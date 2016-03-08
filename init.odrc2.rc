@@ -1,0 +1,80 @@
+on early-init
+    insmod /lib/modules/mali.ko mali_debug_level=2 mali_shared_mem_size=0x40000000
+
+    write /sys/class/graphics/fb0/blank 0
+    write /sys/class/graphics/fb1/blank 1
+
+on init
+    symlink /sdcard /mnt/sdcard
+    symlink /sdcard /storage/sdcard0
+
+
+on fs
+    mount_all /fstab.odrc2
+
+    mkdir /dev/usb-ffs 0770 shell shell
+    mkdir /dev/usb-ffs/adb 0770 shell shell
+    mount functionfs adb /dev/usb-ffs/adb uid=2000,gid=2000
+    write /sys/class/android_usb/android0/f_ffs/aliases adb
+
+on post-fs-data
+    mkdir /data/media 0770 media_rw media_rw
+
+    # Set indication (checked by vold) that we have finished this action
+    setprop vold.post_fs_data_done 1
+
+on boot
+    setprop net.dns1 8.8.8.8
+    setprop net.dns2 8.8.4.4
+
+# fake some battery state
+    setprop status.battery.state Slow
+    setprop status.battery.level 5
+    setprop status.battery.level_raw  50
+    setprop status.battery.level_scale 9
+
+    write /sys/class/android_usb/android0/iManufacturer ${ro.product.manufacturer}
+    write /sys/class/android_usb/android0/iProduct ${ro.product.model}
+
+    setprop service.adb.tcp.port 5555
+    start adbd
+
+service set_display /system/bin/sh /system/bin/set_display_mode.sh
+    class core
+    seclabel u:r:set_display:s0
+    oneshot
+
+service wpa_supplicant /system/bin/wpa_supplicant \
+    -iwlan0 -Dnl80211 -c/data/misc/wifi/wpa_supplicant.conf \
+    -I/system/etc/wifi/wpa_supplicant_overlay.conf \
+    -e/data/misc/wifi/entropy.bin -g@android:wpa_wlan0
+    class late_start
+    socket wpa_wlan0 dgram 660 wifi wifi
+    disabled
+    oneshot
+
+service dhcpcd_wlan0 /system/bin/dhcpcd -aABKL
+    class late_start
+    disabled
+    oneshot
+
+service dhcpcd_eth0 /system/bin/dhcpcd -aABKL
+    class main
+    disabled
+    oneshot
+
+service iprenew_wlan0 /system/bin/dhcpcd -n
+    class late_start
+    disabled
+    oneshot
+
+service iprenew_eth0 /system/bin/dhcpcd -n
+    class late_start
+    disabled
+    oneshot
+
+service resourcemanager /system/bin/resourcemanager
+    class core
+    seclabel u:r:resourcemanager:s0
+    user system
+    group system

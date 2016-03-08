@@ -1,0 +1,43 @@
+Read it first : https://github.com/peyo-hd/local_manifests/tree/npv
+
+# Build Kernel
+ Install gcc-4.9-aarch64-linux-gnu. Then,
+  $ cd kernel/odrc
+  $ ARCH=arm64 make odroidc2_defconfig
+  $ ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- make Image
+  $ ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- make dtbs
+  $ ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- make M=../hardware/arm/gpu/mali CONFIG_MALI400=m CONFIG_MALI450=m CONFIG_GPU_THERMAL=y CONFIG_AM_VDEC_H264_4K2K=y modules  
+
+# Patch frameworks/base
+  Do https://github.com/peyo-hd/device_aml_odrc2/wiki#avoid-logcat-flood
+
+# Build Android source
+ Continue build with http://source.android.com/source/building.html
+  $ source build/envsetup.sh
+  $ lunch odrc2-eng
+  $ make
+
+# Prepare sd card
+ Write bl.img
+  $ cd device/aml/odrc2/boot
+  $ sudo dd if=bl.img of=/dev/sd? bs=4096
+ Partitions of the card should be set-up like followings.
+  p1 512MB for BOOT : Do fdisk, format as fat32
+  p2 512MB for /system : Do fdisk, new primary partition, size 512M.
+  p3 512MB for /cache  : Do fdisk, format as ext4
+  p4 remainings for /data : Do fdisk, format as ext4
+ Set volume label for each partition - system, cache, userdata
+  : use -L option of mkfs.ext4, e2label command, or -n option of mkfs.vfat
+
+# Write system partition
+  $ cd out/target/product/odrc2
+  $ sudo dd if=system.img of=/dev/<p2> bs=1M
+
+# Convert ramdisk.img to uInitrd
+  $ mkimage -A arm64 -C none -T ramdisk -d ramdisk.img uInitrd
+
+# Boot partition, kernel & ramdisk
+  device/aml/odrc2/boot/boot.ini to p1:/
+  kernel/odrc/arch/arm64/boot/Image to p1:/
+  kernel/odrc/arch/arm64/boot/dts/meson64_odroidc2.dtb to p1:/
+  out/target/product/odrc2/uInitrd to p1:/
